@@ -31,6 +31,10 @@ button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-o
 #main{flex:1;min-height:0;display:flex;flex-direction:column}
 .pgs,.strip{flex:none;display:flex;gap:6px;padding:4px 8px;background:var(--bar);border-bottom:1px solid var(--line);overflow-x:auto}
 .pgs button{min-height:36px;min-width:44px;border:1px solid var(--blue);border-radius:999px;white-space:nowrap}
+.dirs{flex:none;display:flex;padding:4px 8px;background:var(--bar);border-bottom:1px solid var(--line)}
+.dirs button{flex:1;min-height:36px;border:1px solid var(--blue);font-weight:600}
+.dirs button:first-child{border-radius:8px 0 0 8px}.dirs button:last-child{border-radius:0 8px 8px 0;border-left:0}
+.dirs button.on{background:var(--blue);color:#fff}
 .pgs button.on{background:var(--blue);color:#fff}
 .strip button{white-space:nowrap}
 .sc{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--cell)}
@@ -39,14 +43,16 @@ th,td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);hei
 th{position:sticky;top:0;z-index:3;background:var(--hd);font-size:14px;line-height:1.35;font-weight:700}
 th:first-child,td.n{position:sticky;left:0;z-index:2;background:var(--hd)}
 th:first-child{z-index:4}
-td input{display:block;width:100%;height:100%;border:0;border-radius:0;background:transparent;color:var(--ink);text-align:right;padding:0 6px;font:inherit;font-size:17px;font-weight:700;min-height:0;-webkit-appearance:none;appearance:none}
+td input{display:block;width:100%;height:100%;border:0;border-radius:0;background:transparent;color:var(--ink);text-align:right;padding:0 6px;font:inherit;font-size:16px;font-weight:700;min-height:0;-webkit-appearance:none;appearance:none}
 td input::placeholder{color:var(--ink);opacity:1}
 td.ov input{color:var(--blue)}
-td.r{text-align:right;padding:0 6px;font-size:17px;font-weight:700}
+td.n input{text-align:left}
+td input{scroll-margin:70px 8px 8px 60px}
+td.r{text-align:right;padding:0 6px;font-size:16px;font-weight:700}
 td input::-webkit-inner-spin-button,td input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 td input[type=number]{-moz-appearance:textfield}
 td[data-t="dt"]{white-space:pre;text-align:left;font-size:17px;line-height:1.35}
-tr.sum td{background:var(--sum);text-align:right;padding:0 6px;font-size:17px;font-weight:700}
+tr.sum td{background:var(--sum);text-align:right;padding:0 6px;font-size:16px;font-weight:700}
 tr.sum td.n{text-align:center;padding:0;font-size:14px}
 .ok{color:var(--blue)}.ng{color:var(--red)}
 .list{flex:1;overflow:auto;padding:12px}
@@ -102,45 +108,85 @@ function load(){
 function save(){try{const j=JSON.stringify(S);localStorage.setItem(KEY,j);localStorage.setItem(KEY+"b",j)}catch(e){}}
 const cur=()=>S.surveys.find(s=>s.id===S.cur)||null;
 const pg=sv=>sv.pages[Math.min(sv.pi,sv.pages.length-1)];
+const sh=sv=>{const p=pg(sv);if(sv.dir==="b"){p.back=p.back||mkPage(p.k);return p.back}return p};
+function copyNames(src,dst,ow){
+  const N=src.rows.map(r=>r.name).filter(n=>n.trim()).reverse();
+  while(dst.rows.length<N.length)dst.rows.push(newRow());
+  dst.rows.forEach((r,i)=>{if(ow)r.name=N[i]||"";else if(!r.name.trim()&&N[i])r.name=N[i]});
+}
+function pair(sv){const p=pg(sv);p.back=p.back||mkPage(p.k);return sv.dir==="b"?[p.back,p]:[p,p.back]}
+function syncNames(sv){const [a,b]=pair(sv);copyNames(a,b,true)}
+function fillNames(sv){const [a,b]=pair(sv);copyNames(b,a,false)}
 function say(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2500)}
 
 function calc(p,carry){
-  let ref=null,gh=null,st=false,bad=false,sBS=0,sFS=0,sD=0,sF=0,sB=0,refd=null,sDd=0,first=null,last=null,lr=null;
-  const out=p.rows.map(r=>{
+  let ref=null,refd=null,gh=null,st=false,bad=false,sBS=0,sFS=0,sD=0,sF=0,sB=0,sDd=0,first=null,last=null,lr=null;
+  const emp=r=>mm(r.bs)==null&&mm(r.fs)==null&&mm(r.fd)==null&&mm(r.bd)==null&&mm(r.dh)==null;
+  let lastIdx=-1;p.rows.forEach((r,i)=>{if(!emp(r))lastIdx=i});
+  const out=p.rows.map((r,i)=>{
     const bs=mm(r.bs),fs=mm(r.fs),ov=mm(r.dh),f=mm(r.fd),b=mm(r.bd);
-    const o={d:null,dd:null,auto:null,ov:ov!=null,gh:null,e:bs==null&&fs==null&&f==null&&b==null&&ov==null};
+    const o={d:null,dd:null,auto:null,ov:ov!=null,gh:null,e:emp(r),rad:false};
     if(o.e)return o;
-    if(bs!=null)sBS+=bs;if(fs!=null)sFS+=fs;if(f!=null)sF+=f;if(b!=null)sB+=b;
-    if(!st){st=true;const g=mm(p.startGH);gh=g!=null?g:carry;o.gh=gh;first=gh;ref=bs;refd=f}
+    const rad=bs==null&&fs!=null&&i<lastIdx;
+    o.rad=rad;
+    if(bs!=null)sBS+=bs;if(b!=null)sB+=b;
+    if(!rad){if(fs!=null)sFS+=fs;if(f!=null)sF+=f}
+    if(!st){st=true;const g=mm(p.startGH);gh=g!=null?g:carry;o.gh=gh;first=gh;ref=bs;refd=b}
     else{
       o.auto=ref!=null&&fs!=null?ref-fs:null;
       const d=ov!=null?ov:o.auto;
-      if(d!=null){o.d=d;sD+=d;gh=gh!=null?gh+d:null}else{gh=null;bad=true}
-      o.gh=gh;ref=bs;if(refd!=null&&b!=null){o.dd=refd+b;sDd+=o.dd}refd=f;
+      if(rad){
+        if(d!=null)o.d=d;
+        o.gh=(gh!=null&&d!=null)?gh+d:null;
+      }else{
+        if(d!=null){o.d=d;sD+=d;gh=gh!=null?gh+d:null}else{gh=null;bad=true}
+        o.gh=gh;
+        if(refd!=null&&f!=null){o.dd=refd+f;sDd+=o.dd}
+        ref=bs;refd=b;
+      }
     }
     last=o.gh;lr={bs,fs};return o;
   });
   const done=st&&!bad&&lr&&lr.fs!=null&&lr.bs==null;
   return{out,sBS,sFS,sD,sF,sB,sDd,first,last,done,carryIn:carry};
 }
-function pageCalc(sv,pi){let carry=null,c;for(let i=0;i<=pi;i++){c=calc(sv.pages[i],carry);if(c.last!=null)carry=c.last}return c}
+function pageCalc(sv,pi,dir){
+  let carry=null,c;
+  for(let i=0;i<=pi;i++){c=calc(sv.pages[i],carry);if(c.last!=null)carry=c.last}
+  if(dir!=="b")return c;
+  const p=sv.pages[pi];p.back=p.back||mkPage(p.k);
+  const cb=calc(p.back,c.last!=null?c.last:null);cb.defEnd=c.first;return cb;
+}
 
 const LBL={bs:"後視 BS",fs:"前視 FS",dh:"高低差",fd:"前視距離",bd:"後視距離"};
 function tableHTML(p){
-  const inp=(f,v,num)=>`<td class="${String(v).trim()?"has":""}"><input data-f="${f}" value="${esc(v)}" ${num||S.kb!==0?'type="number" step="any"':'inputmode="decimal"'} enterkeyhint="done" aria-label="${LBL[f]}"></td>`;
+  const inp=(f,v,num)=>`<td class="${String(v).trim()?"has":""}"><input data-f="${f}" value="${esc(v)}" ${num||S.kb!==0?'type="number" step="any"':'inputmode="decimal"'} enterkeyhint="next" aria-label="${LBL[f]}"></td>`;
   return `<div class="sc"><table>
 <colgroup><col style="width:48px"><col style="width:60px"><col style="width:60px"><col style="width:72px"><col style="width:56px"><col style="width:56px"><col style="width:62px"><col style="width:74px"></colgroup>
-<thead><tr><th>測点</th><th>BS<br>後視</th><th>FS<br>前視</th><th>高低差<br>Δh</th><th>FS<br>距離</th><th>BS<br>距離</th><th>距離計<br>BS+FS</th><th>GH<br>地盤高</th></tr></thead>
-<tbody>${p.rows.map((r,i)=>`<tr data-i="${i}"><td class="n"><input data-f="name" value="${esc(r.name)}" enterkeyhint="done" aria-label="測点名"></td>${inp("bs",r.bs)}${inp("fs",r.fs)}${inp("dh",r.dh,1)}${inp("fd",r.fd)}${inp("bd",r.bd)}<td class="r" data-o="dd"></td><td class="r" data-o="gh"></td></tr>`).join("")}
-<tr class="sum"><td class="n">和</td><td data-t="sbs"></td><td data-t="sfs"></td><td data-t="sd"></td><td data-t="sf"></td><td data-t="sb"></td><td data-t="sdd"></td><td></td></tr>
-<tr class="sum"><td class="n">点検</td><td colspan="2" data-t="d1"></td><td data-t="ok"></td><td colspan="4"></td></tr>
+<thead><tr><th>測点</th><th>BS<br>後視</th><th>FS<br>前視</th><th>高低差<br>Δh</th><th>BS<br>距離</th><th>FS<br>距離</th><th>距離計<br>BS+FS</th><th>GH<br>地盤高</th></tr></thead>
+<tbody>${p.rows.map((r,i)=>`<tr data-i="${i}"><td class="n"><input data-f="name" value="${esc(r.name)}" enterkeyhint="done" aria-label="測点名"></td>${inp("bs",r.bs)}${inp("fs",r.fs)}${inp("dh",r.dh,1)}${inp("bd",r.bd)}${inp("fd",r.fd)}<td class="r" data-o="dd"></td><td class="r" data-o="gh"></td></tr>`).join("")}
+<tr class="sum"><td class="n">和</td><td data-t="sbs"></td><td data-t="sfs"></td><td data-t="sd"></td><td data-t="sb"></td><td data-t="sf"></td><td data-t="sdd"></td><td></td></tr>
 <tr class="sum" id="cl"><td class="n">閉合</td><td colspan="3" data-t="e"></td><td colspan="4" data-t="tol"></td></tr>
 </tbody></table></div>`;
 }
 
+let _cv;
+function fitCols(){try{
+  if(!_cv){try{_cv=document.createElement("canvas").getContext("2d")}catch(e){_cv=null}}
+  const FF='-apple-system,"Hiragino Sans",sans-serif';
+  const m=(t,px)=>{if(_cv){_cv.font="700 "+px+"px "+FF;return _cv.measureText(t).width}return Array.from(t).reduce((a,c)=>a+(c.charCodeAt(0)>255?px:px*0.6),0)};
+  const cols=document.querySelectorAll("colgroup col");if(!cols.length)return;
+  const W=Array(cols.length).fill(0);
+  document.querySelectorAll("thead th").forEach((th,i)=>th.innerHTML.split("<br>").forEach(l=>{W[i]=Math.max(W[i],m(l,14))}));
+  document.querySelectorAll("tbody tr").forEach(tr=>{let i=0;[...tr.children].forEach(td=>{
+    if(td.colSpan>1){i+=td.colSpan;return}
+    const inp=td.querySelector("input"),t=inp?(inp.value||inp.placeholder||""):td.textContent;
+    W[i]=Math.max(W[i],m(t,16));i++})});
+  cols.forEach((c,i)=>{let w=Math.max(44,Math.ceil(W[i])+16);if(i===0)w=Math.min(w,220);c.style.width=w+"px"});
+}catch(e){}}
 function update(){
   const sv=cur();if(!sv||S.tab!=="list"||S.view!=="detail")return;
-  const p=pg(sv),c=pageCalc(sv,sv.pi);
+  const p=sh(sv),c=pageCalc(sv,sv.pi,sv.dir);
   p.rows.forEach((r,i)=>{
     const tr=document.querySelector(`tr[data-i="${i}"]`);if(!tr)return;const o=c.out[i];
     const dh=tr.querySelector('[data-f="dh"]');
@@ -151,11 +197,8 @@ function update(){
   });
   const T=(k,v,cls)=>{const e=document.querySelector(`[data-t="${k}"]`);e.textContent=v;e.className=cls||""};
   T("sbs",f3(c.sBS));T("sfs",f3(c.sFS));T("sd",sg(c.sD));T("sf",fd(c.sF));T("sb",fd(c.sB));T("sdd",fd(c.sDd));
-  const diff=c.sBS-c.sFS;
-  T("d1",f3(diff));
-  const ok=diff===c.sD&&(c.first==null||c.last==null||c.last-c.first===diff);
-  T("ok",c.done?(ok?"OK ✓":"NG ✗"):"",c.done?(ok?"ok":"ng"):"");
-  const known=mm(p.endGH),cl=$("#cl");
+  let known=mm(p.endGH);if(known==null&&sv.dir==="b"&&c.defEnd!=null)known=c.defEnd;
+  const cl=$("#cl");
   cl.style.display=known!=null?"":"none";
   if(known!=null){
     if(c.done&&c.last!=null){
@@ -164,6 +207,7 @@ function update(){
       if(L>0&&k>0){const a=k*Math.sqrt(L),good=Math.abs(e)<=a;T("tol","±"+a.toFixed(1)+(good?" 範囲内":" 超過"),good?"ok":"ng")}else T("tol","")
     }else{T("e","");T("tol","")}
   }
+  fitCols();
   save();
 }
 
@@ -182,14 +226,14 @@ function render(){
   if(S.tab==="settings"){
     bar=`<span></span><b class="ti">設定</b><span></span>`;
     if(sv){
-      const p=pg(sv),ci=pageCalc(sv,sv.pi).carryIn;
-      main=`<div class="form"><p>${esc(sv.name)}・ページ ${sv.pi+1} の設定</p>
-${field("k0","startGH","出発点の既知標高 (m)",p.startGH,ci!=null?f3(ci)+"(前ページから引き継ぎ)":"例 10.000",1)}
-${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,"閉合差を出す場合",1)}
+      const p=sh(sv),pc=pageCalc(sv,sv.pi,sv.dir),ci=pc.carryIn;
+      main=`<div class="form"><p>${esc(sv.name)}・ページ ${sv.pi+1}・${sv.dir==="b"?"復":"往"} の設定</p>
+${field("k0","startGH","出発点の既知標高 (m)",p.startGH,ci!=null?f3(ci)+(sv.dir==="b"?"(往の終点から引き継ぎ)":"(前ページから引き継ぎ)"):"例 10.000",1)}
+${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,sv.dir==="b"&&pc.defEnd!=null?f3(pc.defEnd)+"(往の出発点)":"閉合差を出す場合",1)}
 ${field("k2","L","路線長 (km)・任意",p.L,"空欄なら距離の合計から自動")}
 ${field("k3","k","許容係数 k (mm/√km)",p.k,"10")}
 ${commonHTML()}
-<p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行の前視距離 + この行の後視距離」を自動で足します。</p>
+<p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行のBS距離 + この行のFS距離」を自動で足します(同じ器械点の後視+前視)。</p><p>Enterを押すと、後視→後視距離→次の行の前視→前視距離→同じ行の後視→後視距離…の順に、自動で次の欄へ移動します。</p>
 ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページを開き、共有ボタン →「ホーム画面に追加」。以後はそのアイコンから開くと、全画面のアプリとして使えます。※Safariとホーム画面アプリでは保存データが別になるので、どちらかに統一してください。</p>'}</div>`;
     }else main=`<div class="form">${commonHTML()}<div class="empty">測量リストで測量を開くと、ここで標高などを設定できます。</div></div>`;
   }else if(!d){
@@ -199,15 +243,15 @@ ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページ
     sv.pi=Math.min(sv.pi,sv.pages.length-1);
     bar=`<button class="l" data-a="back">‹ 測量リスト</button>${edit?`<input class="ti nm" data-nm value="${esc(sv.name)}" aria-label="測量名">`:`<b class="ti">${esc(sv.name)}</b>`}<span class="rt"><button data-a="share" aria-label="共有">${ICON.share}</button><button data-a="edit">${edit?"完了":"編集"}</button></span>`;
     const pk="p"+sv.id;
-    main=`<div class="pgs">${sv.pages.map((_,i)=>`<button data-a="pg" data-i="${i}" class="${i===sv.pi?"on":""}">${i+1}</button>`).join("")}<button data-a="addpg">＋ページ</button></div>`
+    main=`<div class="pgs">${sv.pages.map((_,i)=>`<button data-a="pg" data-i="${i}" class="${i===sv.pi?"on":""}">${i+1}</button>`).join("")}<button data-a="addpg">＋ページ</button></div><div class="dirs"><button data-a="dir" data-v="f" class="${sv.dir!=="b"?"on":""}">往</button><button data-a="dir" data-v="b" class="${sv.dir==="b"?"on":""}">復</button></div>`
       +(edit?`<div class="strip"><button data-a="add5">＋5行</button><button data-a="rm">最終行を削除</button>${sv.pages.length>1?`<button data-a="del" data-id="${pk}" style="color:var(--red)">${armed===pk?"もう一度タップ":"このページを削除"}</button>`:""}<button data-a="del" data-id="${sv.id}" style="color:var(--red)">${armed===sv.id?"もう一度タップ":"測量を削除"}</button></div>`:"")
-      +tableHTML(pg(sv));
+      +tableHTML(sh(sv));
   }
   $("#bar").innerHTML=bar;$("#main").innerHTML=main;
   $("#tabs").innerHTML=`<button data-a="tab" data-v="list" class="${S.tab==="list"?"on":""}">${ICON.book}測量リスト</button><button data-a="tab" data-v="settings" class="${S.tab==="settings"?"on":""}">${ICON.gear}設定</button>`;
   const sc=document.querySelector(".sc");
   if(sc&&sv){
-    const key=sv.id+":"+sv.pi;
+    const key=sv.id+":"+sv.pi+(sv.dir||"f");
     if(S.sc&&S.sk===key){sc.scrollLeft=S.sc[0];sc.scrollTop=S.sc[1]}
     sc.addEventListener("scroll",()=>{S.sc=[sc.scrollLeft,sc.scrollTop];S.sk=key;clearTimeout(window._st);window._st=setTimeout(save,300)},{passive:true});
   }
@@ -218,8 +262,8 @@ document.addEventListener("input",e=>{
   const t=e.target,sv=cur();
   if(t.hasAttribute("data-z")){const v=parseFloat(t.value);if(v>=0.5&&v<=1.5){S.zoom=v;applyZoom();save()}return}
   if(!sv)return;
-  if(t.dataset.f){const i=+t.closest("tr").dataset.i;pg(sv).rows[i][t.dataset.f]=t.value;if(t.dataset.f!=="name")t.parentElement.classList.toggle("has",t.value.trim()!=="");update()}
-  else if(t.dataset.k){pg(sv)[t.dataset.k]=t.value;save()}
+  if(t.dataset.f){const i=+t.closest("tr").dataset.i;sh(sv).rows[i][t.dataset.f]=t.value;if(t.dataset.f!=="name")t.parentElement.classList.toggle("has",t.value.trim()!=="");if(t.dataset.f==="name")syncNames(sv);update()}
+  else if(t.dataset.k){sh(sv)[t.dataset.k]=t.value;save()}
   else if(t.hasAttribute("data-nm")){sv.name=t.value;save()}
 });
 document.addEventListener("click",e=>{
@@ -233,31 +277,44 @@ document.addEventListener("click",e=>{
   else if(a==="edit")edit=!edit;
   else if(a==="kb")S.kb=S.kb===0?1:0;
   else if(a==="pg"&&sv)sv.pi=+b.dataset.i;
-  else if(a==="addpg"&&sv){sv.pages.push(mkPage(pg(sv).k));sv.pi=sv.pages.length-1}
-  else if(a==="add5"&&sv){for(let i=0;i<5;i++)pg(sv).rows.push(newRow())}
-  else if(a==="rm"&&sv){const r=pg(sv).rows;if(r.length>1)r.pop()}
+  else if(a==="dir"&&sv)sv.dir=b.dataset.v;
+  else if(a==="addpg"&&sv){sv.pages.push(mkPage(sh(sv).k));sv.pi=sv.pages.length-1}
+  else if(a==="add5"&&sv){for(let i=0;i<5;i++)sh(sv).rows.push(newRow())}
+  else if(a==="rm"&&sv){const r=sh(sv).rows;if(r.length>1)r.pop()}
   else if(a==="del"){
     const id=b.dataset.id;
     if(armed!==id){armed=id;setTimeout(()=>{if(armed===id){armed="";render()}},3000)}
     else if(id[0]==="p"){sv.pages.splice(sv.pi,1);sv.pi=Math.max(0,sv.pi-1);armed=""}
     else{S.surveys=S.surveys.filter(s=>s.id!==id);if(S.cur===id){S.cur=null;S.view="list"}armed="";edit=false}
   }
+  if(sv&&(a==="dir"||a==="pg"))fillNames(sv);
   save();render();
 });
 
 async function share(){
-  const sv=cur();if(!sv)return;const p=pg(sv),c=pageCalc(sv,sv.pi);
-  const L=["測点\tBS\tFS\t高低差\tFS距離\tBS距離\t距離計\tGH"];
-  p.rows.forEach((r,i)=>{const o=c.out[i];if(!o.e)L.push([r.name,r.bs,r.fs,sg(o.d),r.fd,r.bd,fd(o.dd),f3(o.gh)].join("\t"))});
-  L.push(["和",f3(c.sBS),f3(c.sFS),sg(c.sD),fd(c.sF),fd(c.sB),fd(c.sDd),""].join("\t"));
-  L.push(["点検",f3(c.sBS-c.sFS),"","","","",""].join("\t"));
-  const text=sv.name+" ページ"+(sv.pi+1)+"\n"+L.join("\n");
+  const sv=cur();if(!sv)return;const p=sh(sv),c=pageCalc(sv,sv.pi,sv.dir);
+  const L=["測点\tBS\tFS\t高低差\tBS距離\tFS距離\t距離計\tGH"];
+  p.rows.forEach((r,i)=>{const o=c.out[i];if(!o.e)L.push([r.name,r.bs,r.fs,sg(o.d),r.bd,r.fd,fd(o.dd),f3(o.gh)].join("\t"))});
+  L.push(["和",f3(c.sBS),f3(c.sFS),sg(c.sD),fd(c.sB),fd(c.sF),fd(c.sDd),""].join("\t"));
+  const text=sv.name+" ページ"+(sv.pi+1)+(sv.dir==="b"?" 復":" 往")+"\n"+L.join("\n");
   try{if(navigator.share){await navigator.share({title:sv.name,text});return}}catch(e){if(e&&e.name==="AbortError")return}
   try{await navigator.clipboard.writeText(text);say("コピーしました")}catch(e){say("コピーできませんでした")}
 }
 addEventListener("visibilitychange",()=>{if(document.hidden)save()});
 addEventListener("pagehide",save);
-document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.tagName==="INPUT"){e.preventDefault();e.target.blur();save()}});
+const NEXT={bs:["bd",0],bd:["fs",1],fs:["fd",0],fd:["bs",0]};
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"||e.target.tagName!=="INPUT")return;
+  e.preventDefault();
+  const t=e.target,sv=cur(),f=t.dataset.f,tr=t.closest("tr");
+  if(sv&&f&&NEXT[f]&&tr){
+    const i=+tr.dataset.i+NEXT[f][1],rows=sh(sv).rows;
+    if(i>=rows.length){while(rows.length<=i)rows.push(newRow());save();render()}
+    const el=document.querySelector(`tr[data-i="${i}"] [data-f="${NEXT[f][0]}"]`);
+    if(el){el.focus();try{el.select()}catch(_){}try{el.scrollIntoView({block:"nearest",inline:"nearest"})}catch(_){}}
+  }else t.blur();
+  save();
+});
 applyZoom();
 try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
 addEventListener("offline",()=>say("圏外です。入力は端末に保存されます"));
