@@ -217,6 +217,7 @@ const ICON={
   share:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1"/></svg>'
 };
 function applyZoom(){document.documentElement.style.setProperty("--z",String(S.zoom||0.8))}
+const CSVB='<button data-a="csv" data-v="page">CSV(このページ)</button><button data-a="csv" data-v="all">CSV(全ページ)</button><button data-a="csv" data-v="copy">CSVコピー</button>';
 const commonHTML=()=>`<div class="f"><label for="z0">表示倍率(1=標準、0.8=少し小さく)</label><input id="z0" data-z value="${S.zoom||0.8}" inputmode="decimal"></div><div class="f"><label>数字キーボード</label><button data-a="kb" style="padding:0;min-height:40px;text-align:left;font-weight:600;font-size:18px">${S.kb===0?"電卓型(Enterなし)":"Enter付き"}　▸タップで切替</button></div>`;
 const field=(id,key,label,v,ph,num)=>`<div class="f"><label for="${id}">${label}</label><input id="${id}" data-k="${key}" value="${esc(v)}" ${num?'type="number" step="any"':'inputmode="decimal"'} placeholder="${ph}"></div>`;
 
@@ -233,6 +234,7 @@ ${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,sv.dir==="b"&&
 ${field("k2","L","路線長 (km)・任意",p.L,"空欄なら距離の合計から自動")}
 ${field("k3","k","許容係数 k (mm/√km)",p.k,"10")}
 ${commonHTML()}
+<div class="f"><label>CSV出力(全ページ=往復すべて)</label><div style="display:flex;gap:4px;flex-wrap:wrap">${CSVB}</div></div>
 <p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行のBS距離 + この行のFS距離」を自動で足します(同じ器械点の後視+前視)。</p><p>Enterを押すと、後視→後視距離→次の行の前視→前視距離→同じ行の後視→後視距離…の順に、自動で次の欄へ移動します。</p>
 ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページを開き、共有ボタン →「ホーム画面に追加」。以後はそのアイコンから開くと、全画面のアプリとして使えます。※Safariとホーム画面アプリでは保存データが別になるので、どちらかに統一してください。</p>'}</div>`;
     }else main=`<div class="form">${commonHTML()}<div class="empty">測量リストで測量を開くと、ここで標高などを設定できます。</div></div>`;
@@ -244,7 +246,7 @@ ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページ
     bar=`<button class="l" data-a="back">‹ 測量リスト</button>${edit?`<input class="ti nm" data-nm value="${esc(sv.name)}" aria-label="測量名">`:`<b class="ti">${esc(sv.name)}</b>`}<span class="rt"><button data-a="share" aria-label="共有">${ICON.share}</button><button data-a="edit">${edit?"完了":"編集"}</button></span>`;
     const pk="p"+sv.id;
     main=`<div class="pgs">${sv.pages.map((_,i)=>`<button data-a="pg" data-i="${i}" class="${i===sv.pi?"on":""}">${i+1}</button>`).join("")}<button data-a="addpg">＋ページ</button></div><div class="dirs"><button data-a="dir" data-v="f" class="${sv.dir!=="b"?"on":""}">往</button><button data-a="dir" data-v="b" class="${sv.dir==="b"?"on":""}">復</button></div>`
-      +(edit?`<div class="strip"><button data-a="add5">＋5行</button><button data-a="rm">最終行を削除</button>${sv.pages.length>1?`<button data-a="del" data-id="${pk}" style="color:var(--red)">${armed===pk?"もう一度タップ":"このページを削除"}</button>`:""}<button data-a="del" data-id="${sv.id}" style="color:var(--red)">${armed===sv.id?"もう一度タップ":"測量を削除"}</button></div>`:"")
+      +(edit?`<div class="strip"><button data-a="add5">＋5行</button>${CSVB}<button data-a="rm">最終行を削除</button>${sv.pages.length>1?`<button data-a="del" data-id="${pk}" style="color:var(--red)">${armed===pk?"もう一度タップ":"このページを削除"}</button>`:""}<button data-a="del" data-id="${sv.id}" style="color:var(--red)">${armed===sv.id?"もう一度タップ":"測量を削除"}</button></div>`:"")
       +tableHTML(sh(sv));
   }
   $("#bar").innerHTML=bar;$("#main").innerHTML=main;
@@ -270,6 +272,7 @@ document.addEventListener("click",e=>{
   const b=e.target.closest("[data-a]");if(!b)return;
   const a=b.dataset.a,sv=cur();
   if(a==="share"){share();return}
+  if(a==="csv"){exportCsv(b.dataset.v);return}
   if(a==="tab"){S.tab=b.dataset.v;edit=false}
   else if(a==="open"){S.cur=b.dataset.id;S.view="detail";edit=false}
   else if(a==="back"){S.view="list";edit=false}
@@ -291,6 +294,29 @@ document.addEventListener("click",e=>{
   save();render();
 });
 
+function csvOf(sv,pages){
+  const q=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
+  const L=[["ページ","往復","測点","BS後視","FS前視","高低差","BS距離","FS距離","距離計","GH地盤高","備考"]];
+  pages.forEach(pi=>["f","b"].forEach(dr=>{
+    const p=dr==="b"?sv.pages[pi].back:sv.pages[pi];if(!p)return;
+    const c=pageCalc(sv,pi,dr),lab=dr==="b"?"復":"往";let any=false;
+    p.rows.forEach((r,i)=>{const o=c.out[i];if(o.e)return;any=true;
+      L.push([pi+1,lab,r.name,r.bs,r.fs,f3(o.d),r.bd,r.fd,fd(o.dd),f3(o.gh),o.rad?"放射点":""])});
+    if(any)L.push([pi+1,lab,"和",f3(c.sBS),f3(c.sFS),f3(c.sD),fd(c.sB),fd(c.sF),fd(c.sDd),"",""]);
+  }));
+  return "\ufeff"+L.map(r=>r.map(q).join(",")).join("\r\n");
+}
+async function exportCsv(mode){
+  const sv=cur();if(!sv)return;
+  const all=mode!=="page",csv=csvOf(sv,all?sv.pages.map((_,i)=>i):[sv.pi]);
+  if(mode==="copy"){try{await navigator.clipboard.writeText(csv.replace(/^\ufeff/,""));say("CSVをコピーしました")}catch(e){say("コピーできませんでした")}return}
+  const name=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_")+(all?"_全ページ":"_p"+(sv.pi+1))+".csv";
+  try{const file=new File([csv],name,{type:"text/csv"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
+  catch(e){if(e&&e.name==="AbortError")return}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove();say("CSVを保存しました");return}catch(e){}
+  say("出力できませんでした。「CSVコピー」をお試しください")
+}
 async function share(){
   const sv=cur();if(!sv)return;const p=sh(sv),c=pageCalc(sv,sv.pi,sv.dir);
   const L=["測点\tBS\tFS\t高低差\tBS距離\tFS距離\t距離計\tGH"];
