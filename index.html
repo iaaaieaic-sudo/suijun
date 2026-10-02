@@ -234,7 +234,7 @@ ${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,sv.dir==="b"&&
 ${field("k2","L","路線長 (km)・任意",p.L,"空欄なら距離の合計から自動")}
 ${field("k3","k","許容係数 k (mm/√km)",p.k,"10")}
 ${commonHTML()}
-<div class="f"><label>CSV出力(全ページ=往復すべて)</label><div style="display:flex;gap:4px;flex-wrap:wrap">${CSVB}</div></div>
+<div class="f"><label>CSV出力(全ページ=ページごとに別ファイル。往復は同じファイル)</label><div style="display:flex;gap:4px;flex-wrap:wrap">${CSVB}</div></div>
 <p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行のBS距離 + この行のFS距離」を自動で足します(同じ器械点の後視+前視)。</p><p>Enterを押すと、後視→後視距離→次の行の前視→前視距離→同じ行の後視→後視距離…の順に、自動で次の欄へ移動します。</p>
 ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページを開き、共有ボタン →「ホーム画面に追加」。以後はそのアイコンから開くと、全画面のアプリとして使えます。※Safariとホーム画面アプリでは保存データが別になるので、どちらかに統一してください。</p>'}</div>`;
     }else main=`<div class="form">${commonHTML()}<div class="empty">測量リストで測量を開くと、ここで標高などを設定できます。</div></div>`;
@@ -295,26 +295,30 @@ document.addEventListener("click",e=>{
 });
 
 function csvOf(sv,pages){
+  const nm=n=>/^\d{1,4}[-\/]\d{1,4}([-\/]\d{1,4})?$/.test(n.trim())?n.trim().replace(/-/g,"\u2011").replace(/\//g,"\u2215"):n;
   const q=v=>{v=v==null?"":String(v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
   const L=[["ページ","往復","測点","BS後視","FS前視","高低差","BS距離","FS距離","距離計","GH地盤高","備考"]];
   pages.forEach(pi=>["f","b"].forEach(dr=>{
     const p=dr==="b"?sv.pages[pi].back:sv.pages[pi];if(!p)return;
     const c=pageCalc(sv,pi,dr),lab=dr==="b"?"復":"往";let any=false;
     p.rows.forEach((r,i)=>{const o=c.out[i];if(o.e)return;any=true;
-      L.push([pi+1,lab,r.name,r.bs,r.fs,f3(o.d),r.bd,r.fd,fd(o.dd),f3(o.gh),o.rad?"放射点":""])});
+      L.push([pi+1,lab,nm(r.name),r.bs,r.fs,f3(o.d),r.bd,r.fd,fd(o.dd),f3(o.gh),o.rad?"放射点":""])});
     if(any)L.push([pi+1,lab,"和",f3(c.sBS),f3(c.sFS),f3(c.sD),fd(c.sB),fd(c.sF),fd(c.sDd),"",""]);
   }));
   return "\ufeff"+L.map(r=>r.map(q).join(",")).join("\r\n");
 }
 async function exportCsv(mode){
   const sv=cur();if(!sv)return;
-  const all=mode!=="page",csv=csvOf(sv,all?sv.pages.map((_,i)=>i):[sv.pi]);
-  if(mode==="copy"){try{await navigator.clipboard.writeText(csv.replace(/^\ufeff/,""));say("CSVをコピーしました")}catch(e){say("コピーできませんでした")}return}
-  const name=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_")+(all?"_全ページ":"_p"+(sv.pi+1))+".csv";
-  try{const file=new File([csv],name,{type:"text/csv"});
-    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
+  const pages=mode==="page"?[sv.pi]:sv.pages.map((_,i)=>i);
+  if(mode==="copy"){try{await navigator.clipboard.writeText(csvOf(sv,pages).replace(/^\ufeff/,""));say("CSVをコピーしました")}catch(e){say("コピーできませんでした")}return}
+  const base=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_");
+  const files=pages.map(pi=>({name:base+"_p"+(pi+1)+".csv",csv:csvOf(sv,[pi])})).filter(x=>x.csv.indexOf("\n")>=0);
+  if(!files.length){say("出力するデータがありません");return}
+  try{const fl=files.map(x=>new File([x.csv],x.name,{type:"text/csv"}));
+    if(navigator.canShare&&navigator.canShare({files:fl})){await navigator.share({files:fl,title:base});return}}
   catch(e){if(e&&e.name==="AbortError")return}
-  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove();say("CSVを保存しました");return}catch(e){}
+  try{for(const x of files){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([x.csv],{type:"text/csv;charset=utf-8"}));a.download=x.name;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
+    say(files.length+"個のCSVを保存しました");return}catch(e){}
   say("出力できませんでした。「CSVコピー」をお試しください")
 }
 async function share(){
