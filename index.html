@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta id="vp" name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="水準測量">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
+<title>水準測量</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#007aff">
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#f2f2f7;--bar:#f8f8f8;--cell:#fff;--hd:#e6e6e8;--grid:#9a9a9f;--ink:#000;--sub:#6b6b70;--blue:#007aff;--sum:#c9f0f8;--line:#c8c8cc;--red:#d92d20}
+html{scroll-padding-top:env(safe-area-inset-top,0px);height:100%;overflow:hidden;background:var(--bar);overscroll-behavior:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--bar:#1c1c1e;--cell:#121214;--hd:#2c2c2e;--grid:#58585c;--ink:#fff;--sub:#a0a0a8;--blue:#0a84ff;--sum:#14414d;--line:#38383a;--red:#ff6b61}}
+:root[data-theme="dark"]{--bg:#000;--bar:#1c1c1e;--cell:#121214;--hd:#2c2c2e;--grid:#58585c;--ink:#fff;--sub:#a0a0a8;--blue:#0a84ff;--sum:#14414d;--line:#38383a;--red:#ff6b61}
+*,*:before,*:after{box-sizing:inherit}
+body{margin:0;width:calc(100%/var(--z,1));height:calc(100%/var(--z,1));transform:scale(var(--z,1));transform-origin:0 0;display:flex;flex-direction:column;overflow:hidden;background:var(--bg);color:var(--ink);font:17px/1.4 -apple-system,"Hiragino Sans",system-ui,sans-serif;-webkit-text-size-adjust:100%;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:manipulation;overscroll-behavior:none}
+input{-webkit-user-select:text;user-select:text}
+button{font:inherit;color:var(--blue);background:none;border:0;padding:0 10px;min-height:44px;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+#bar{flex:none;display:grid;grid-template-columns:1fr minmax(0,auto) 1fr;align-items:center;min-height:52px;background:var(--bar);border-bottom:1px solid var(--line)}
+#bar .l{justify-self:start;white-space:nowrap}
+#bar .rt{justify-self:end;display:flex}
+#bar .ti{font-weight:600;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:44vw}
+#bar .nm{font:inherit;font-weight:600;border:1px solid var(--line);border-radius:8px;background:var(--cell);color:var(--ink);padding:6px 8px;width:42vw;min-height:36px;font-size:16px}
+#main{flex:1;min-height:0;display:flex;flex-direction:column}
+.pgs,.strip{flex:none;display:flex;gap:6px;padding:4px 8px;background:var(--bar);border-bottom:1px solid var(--line);overflow-x:auto}
+.pgs button{min-height:36px;min-width:44px;border:1px solid var(--blue);border-radius:999px;white-space:nowrap}
+.pgs button.on{background:var(--blue);color:#fff}
+.strip button{white-space:nowrap}
+.sc{flex:1;min-height:0;overflow:auto;-webkit-overflow-scrolling:touch;background:var(--cell)}
+table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%;min-width:488px}
+th,td{border-right:1px solid var(--grid);border-bottom:1px solid var(--grid);height:64px;padding:0;position:relative;font-variant-numeric:tabular-nums}
+th{position:sticky;top:0;z-index:3;background:var(--hd);font-size:14px;line-height:1.35;font-weight:700}
+th:first-child,td.n{position:sticky;left:0;z-index:2;background:var(--hd)}
+th:first-child{z-index:4}
+td input{display:block;width:100%;height:100%;border:0;border-radius:0;background:transparent;color:var(--ink);text-align:right;padding:0 6px;font:inherit;font-size:17px;font-weight:700;min-height:0;-webkit-appearance:none;appearance:none}
+td input::placeholder{color:var(--ink);opacity:1}
+td.ov input{color:var(--blue)}
+td.r{text-align:right;padding:0 6px;font-size:17px;font-weight:700}
+td input::-webkit-inner-spin-button,td input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+td input[type=number]{-moz-appearance:textfield}
+td[data-t="dt"]{white-space:pre;text-align:left;font-size:17px;line-height:1.35}
+tr.sum td{background:var(--sum);text-align:right;padding:0 6px;font-size:17px;font-weight:700}
+tr.sum td.n{text-align:center;padding:0;font-size:14px}
+.ok{color:var(--blue)}.ng{color:var(--red)}
+.list{flex:1;overflow:auto;padding:12px}
+.li{display:flex;align-items:center;background:var(--cell);border-bottom:1px solid var(--line)}
+.li:first-child{border-radius:10px 10px 0 0}.li:last-child{border-radius:0 0 10px 10px;border-bottom:0}
+.li .o{flex:1;text-align:left;color:var(--ink);padding:8px 14px;min-height:60px}
+.li small{display:block;color:var(--sub);font-size:13px}
+.li .d{color:var(--red)}
+.empty{color:var(--sub);text-align:center;padding:40px 20px}
+.form{flex:1;overflow:auto;padding:14px}
+.form .f{background:var(--cell);border-radius:10px;padding:10px 14px;margin-bottom:10px}
+.form label{display:block;font-size:13px;color:var(--sub)}
+.form input{width:100%;border:0;background:transparent;color:var(--ink);font:inherit;font-size:20px;font-weight:600;padding:4px 0;min-height:40px}
+.form p{color:var(--sub);font-size:13px;margin:0 4px 10px}
+#tabs{flex:none;display:flex;background:var(--bar);border-top:1px solid var(--line)}
+#tabs button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:11px;color:var(--sub);padding:6px 0 4px}
+#tabs button.on{color:var(--blue)}
+#tabs svg{width:26px;height:26px}
+#toast{position:fixed;left:50%;bottom:calc(70px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#222;color:#fff;padding:8px 14px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="main"></div>
+<div id="tabs"></div>
+<div id="toast" role="status"></div>
+<script>
+const KEY="lvl-app-v3";
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const mm=v=>{const n=parseFloat(String(v).replace(",","."));return isFinite(n)?Math.round(n*1000):null};
+const f3=n=>n==null?"":(n/1000).toFixed(3);
+const sg=n=>n==null?"":(n>0?"+":"")+f3(n);
+const fd=n=>n==null?"":String(Number((n/1000).toFixed(3)));
+const sgd=n=>n==null?"":(n>0?"+":"")+fd(n);
+const newRow=()=>({name:"",bs:"",fs:"",dh:"",fd:"",bd:""});
+const mkPage=k=>({startGH:"",endGH:"",L:"",k:k||"10",rows:Array.from({length:10},newRow)});
+const mk=name=>({id:"s"+Date.now()+Math.floor(Math.random()*999),name,pi:0,pages:[mkPage()]});
+let S=load(),edit=false,armed="";
+function load(){
+  let o=null;
+  try{o=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+  if(!(o&&o.surveys))try{o=JSON.parse(localStorage.getItem(KEY+"b"))}catch(e){}
+  if(!(o&&o.surveys)){
+    try{const v=JSON.parse(localStorage.getItem("lvl-grid-v2"));
+      if(v&&v.surveys)o={surveys:v.surveys.map(s=>({id:s.id,name:s.name,pi:0,pages:[{startGH:s.startGH,endGH:s.endGH,L:s.L,k:s.k,rows:s.rows.map((r,i)=>({name:r.name===String(i+1)?"":r.name,bs:r.bs,fs:r.fs,dh:"",fd:"",bd:""}))}]})),cur:null,view:"list",tab:"list"}}catch(e){}
+  }
+  if(!o)o={surveys:[mk("新規測量")],cur:null,view:"list",tab:"list"};
+  if(!o.surveys.some(s=>s.id===o.cur)){o.cur=null;o.view="list"}
+  return o;
+}
+function save(){try{const j=JSON.stringify(S);localStorage.setItem(KEY,j);localStorage.setItem(KEY+"b",j)}catch(e){}}
+const cur=()=>S.surveys.find(s=>s.id===S.cur)||null;
+const pg=sv=>sv.pages[Math.min(sv.pi,sv.pages.length-1)];
+function say(t){const e=$("#toast");e.textContent=t;e.classList.add("on");setTimeout(()=>e.classList.remove("on"),2500)}
+
+function calc(p,carry){
+  let ref=null,gh=null,st=false,bad=false,sBS=0,sFS=0,sD=0,sF=0,sB=0,refd=null,sDd=0,first=null,last=null,lr=null;
+  const out=p.rows.map(r=>{
+    const bs=mm(r.bs),fs=mm(r.fs),ov=mm(r.dh),f=mm(r.fd),b=mm(r.bd);
+    const o={d:null,dd:null,auto:null,ov:ov!=null,gh:null,e:bs==null&&fs==null&&f==null&&b==null&&ov==null};
+    if(o.e)return o;
+    if(bs!=null)sBS+=bs;if(fs!=null)sFS+=fs;if(f!=null)sF+=f;if(b!=null)sB+=b;
+    if(!st){st=true;const g=mm(p.startGH);gh=g!=null?g:carry;o.gh=gh;first=gh;ref=bs;refd=f}
+    else{
+      o.auto=ref!=null&&fs!=null?ref-fs:null;
+      const d=ov!=null?ov:o.auto;
+      if(d!=null){o.d=d;sD+=d;gh=gh!=null?gh+d:null}else{gh=null;bad=true}
+      o.gh=gh;ref=bs;if(refd!=null&&b!=null){o.dd=refd+b;sDd+=o.dd}refd=f;
+    }
+    last=o.gh;lr={bs,fs};return o;
+  });
+  const done=st&&!bad&&lr&&lr.fs!=null&&lr.bs==null;
+  return{out,sBS,sFS,sD,sF,sB,sDd,first,last,done,carryIn:carry};
+}
+function pageCalc(sv,pi){let carry=null,c;for(let i=0;i<=pi;i++){c=calc(sv.pages[i],carry);if(c.last!=null)carry=c.last}return c}
+
+const LBL={bs:"後視 BS",fs:"前視 FS",dh:"高低差",fd:"前視距離",bd:"後視距離"};
+function tableHTML(p){
+  const inp=(f,v,num)=>`<td class="${String(v).trim()?"has":""}"><input data-f="${f}" value="${esc(v)}" ${num||S.kb!==0?'type="number" step="any"':'inputmode="decimal"'} enterkeyhint="done" aria-label="${LBL[f]}"></td>`;
+  return `<div class="sc"><table>
+<colgroup><col style="width:48px"><col style="width:60px"><col style="width:60px"><col style="width:72px"><col style="width:56px"><col style="width:56px"><col style="width:62px"><col style="width:74px"></colgroup>
+<thead><tr><th>測点</th><th>BS<br>後視</th><th>FS<br>前視</th><th>高低差<br>Δh</th><th>FS<br>距離</th><th>BS<br>距離</th><th>距離計<br>BS+FS</th><th>GH<br>地盤高</th></tr></thead>
+<tbody>${p.rows.map((r,i)=>`<tr data-i="${i}"><td class="n"><input data-f="name" value="${esc(r.name)}" enterkeyhint="done" aria-label="測点名"></td>${inp("bs",r.bs)}${inp("fs",r.fs)}${inp("dh",r.dh,1)}${inp("fd",r.fd)}${inp("bd",r.bd)}<td class="r" data-o="dd"></td><td class="r" data-o="gh"></td></tr>`).join("")}
+<tr class="sum"><td class="n">和</td><td data-t="sbs"></td><td data-t="sfs"></td><td data-t="sd"></td><td data-t="sf"></td><td data-t="sb"></td><td data-t="sdd"></td><td></td></tr>
+<tr class="sum"><td class="n">点検</td><td colspan="2" data-t="d1"></td><td data-t="ok"></td><td colspan="4"></td></tr>
+<tr class="sum" id="cl"><td class="n">閉合</td><td colspan="3" data-t="e"></td><td colspan="4" data-t="tol"></td></tr>
+</tbody></table></div>`;
+}
+
+function update(){
+  const sv=cur();if(!sv||S.tab!=="list"||S.view!=="detail")return;
+  const p=pg(sv),c=pageCalc(sv,sv.pi);
+  p.rows.forEach((r,i)=>{
+    const tr=document.querySelector(`tr[data-i="${i}"]`);if(!tr)return;const o=c.out[i];
+    const dh=tr.querySelector('[data-f="dh"]');
+    dh.placeholder=sg(o.auto);dh.parentElement.classList.toggle("ov",o.ov);
+    tr.querySelector('[data-o="gh"]').textContent=f3(o.gh);
+    tr.querySelector('[data-o="dd"]').textContent=fd(o.dd);
+    tr.querySelector("td.n").classList.toggle("has",!o.e||r.name.trim()!=="");
+  });
+  const T=(k,v,cls)=>{const e=document.querySelector(`[data-t="${k}"]`);e.textContent=v;e.className=cls||""};
+  T("sbs",f3(c.sBS));T("sfs",f3(c.sFS));T("sd",sg(c.sD));T("sf",fd(c.sF));T("sb",fd(c.sB));T("sdd",fd(c.sDd));
+  const diff=c.sBS-c.sFS;
+  T("d1",f3(diff));
+  const ok=diff===c.sD&&(c.first==null||c.last==null||c.last-c.first===diff);
+  T("ok",c.done?(ok?"OK ✓":"NG ✗"):"",c.done?(ok?"ok":"ng"):"");
+  const known=mm(p.endGH),cl=$("#cl");
+  cl.style.display=known!=null?"":"none";
+  if(known!=null){
+    if(c.done&&c.last!=null){
+      const e=c.last-known;T("e",(e>0?"+":"")+e+" mm");
+      const L=p.L!==""?parseFloat(p.L):(c.sF+c.sB)/1e6,k=parseFloat(p.k);
+      if(L>0&&k>0){const a=k*Math.sqrt(L),good=Math.abs(e)<=a;T("tol","±"+a.toFixed(1)+(good?" 範囲内":" 超過"),good?"ok":"ng")}else T("tol","")
+    }else{T("e","");T("tol","")}
+  }
+  save();
+}
+
+const ICON={
+  book:'<svg viewBox="0 0 26 26" fill="currentColor"><path d="M5 3h14a2 2 0 0 1 2 2v14H7a2 2 0 0 0 0 4h14v1H7a3 3 0 0 1-3-3V4a1 1 0 0 1 1-1z"/></svg>',
+  gear:'<svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="13" cy="13" r="4"/><circle cx="13" cy="13" r="9" stroke-dasharray="4 3.1"/></svg>',
+  share:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1"/></svg>'
+};
+function applyZoom(){document.documentElement.style.setProperty("--z",String(S.zoom||0.8))}
+const commonHTML=()=>`<div class="f"><label for="z0">表示倍率(1=標準、0.8=少し小さく)</label><input id="z0" data-z value="${S.zoom||0.8}" inputmode="decimal"></div><div class="f"><label>数字キーボード</label><button data-a="kb" style="padding:0;min-height:40px;text-align:left;font-weight:600;font-size:18px">${S.kb===0?"電卓型(Enterなし)":"Enter付き"}　▸タップで切替</button></div>`;
+const field=(id,key,label,v,ph,num)=>`<div class="f"><label for="${id}">${label}</label><input id="${id}" data-k="${key}" value="${esc(v)}" ${num?'type="number" step="any"':'inputmode="decimal"'} placeholder="${ph}"></div>`;
+
+function render(){
+  const sv=cur(),d=S.tab==="list"&&S.view==="detail"&&sv;
+  let bar,main;
+  if(S.tab==="settings"){
+    bar=`<span></span><b class="ti">設定</b><span></span>`;
+    if(sv){
+      const p=pg(sv),ci=pageCalc(sv,sv.pi).carryIn;
+      main=`<div class="form"><p>${esc(sv.name)}・ページ ${sv.pi+1} の設定</p>
+${field("k0","startGH","出発点の既知標高 (m)",p.startGH,ci!=null?f3(ci)+"(前ページから引き継ぎ)":"例 10.000",1)}
+${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,"閉合差を出す場合",1)}
+${field("k2","L","路線長 (km)・任意",p.L,"空欄なら距離の合計から自動")}
+${field("k3","k","許容係数 k (mm/√km)",p.k,"10")}
+${commonHTML()}
+<p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行の前視距離 + この行の後視距離」を自動で足します。</p>
+${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページを開き、共有ボタン →「ホーム画面に追加」。以後はそのアイコンから開くと、全画面のアプリとして使えます。※Safariとホーム画面アプリでは保存データが別になるので、どちらかに統一してください。</p>'}</div>`;
+    }else main=`<div class="form">${commonHTML()}<div class="empty">測量リストで測量を開くと、ここで標高などを設定できます。</div></div>`;
+  }else if(!d){
+    bar=`<button class="l" data-a="edit">${edit?"完了":"編集"}</button><b class="ti">測量リスト</b><span class="rt"><button data-a="new" aria-label="新規測量" style="font-size:26px">＋</button></span>`;
+    main=`<div class="list">${S.surveys.length?S.surveys.map(s=>`<div class="li"><button class="o" data-a="open" data-id="${s.id}">${esc(s.name)}<small>${s.pages.length} ページ</small></button>${edit?`<button class="d" data-a="del" data-id="${s.id}">${armed===s.id?"もう一度タップ":"削除"}</button>`:""}</div>`).join(""):`<div class="empty">＋で測量を追加します。</div>`}</div>`;
+  }else{
+    sv.pi=Math.min(sv.pi,sv.pages.length-1);
+    bar=`<button class="l" data-a="back">‹ 測量リスト</button>${edit?`<input class="ti nm" data-nm value="${esc(sv.name)}" aria-label="測量名">`:`<b class="ti">${esc(sv.name)}</b>`}<span class="rt"><button data-a="share" aria-label="共有">${ICON.share}</button><button data-a="edit">${edit?"完了":"編集"}</button></span>`;
+    const pk="p"+sv.id;
+    main=`<div class="pgs">${sv.pages.map((_,i)=>`<button data-a="pg" data-i="${i}" class="${i===sv.pi?"on":""}">${i+1}</button>`).join("")}<button data-a="addpg">＋ページ</button></div>`
+      +(edit?`<div class="strip"><button data-a="add5">＋5行</button><button data-a="rm">最終行を削除</button>${sv.pages.length>1?`<button data-a="del" data-id="${pk}" style="color:var(--red)">${armed===pk?"もう一度タップ":"このページを削除"}</button>`:""}<button data-a="del" data-id="${sv.id}" style="color:var(--red)">${armed===sv.id?"もう一度タップ":"測量を削除"}</button></div>`:"")
+      +tableHTML(pg(sv));
+  }
+  $("#bar").innerHTML=bar;$("#main").innerHTML=main;
+  $("#tabs").innerHTML=`<button data-a="tab" data-v="list" class="${S.tab==="list"?"on":""}">${ICON.book}測量リスト</button><button data-a="tab" data-v="settings" class="${S.tab==="settings"?"on":""}">${ICON.gear}設定</button>`;
+  const sc=document.querySelector(".sc");
+  if(sc&&sv){
+    const key=sv.id+":"+sv.pi;
+    if(S.sc&&S.sk===key){sc.scrollLeft=S.sc[0];sc.scrollTop=S.sc[1]}
+    sc.addEventListener("scroll",()=>{S.sc=[sc.scrollLeft,sc.scrollTop];S.sk=key;clearTimeout(window._st);window._st=setTimeout(save,300)},{passive:true});
+  }
+  update();
+}
+
+document.addEventListener("input",e=>{
+  const t=e.target,sv=cur();
+  if(t.hasAttribute("data-z")){const v=parseFloat(t.value);if(v>=0.5&&v<=1.5){S.zoom=v;applyZoom();save()}return}
+  if(!sv)return;
+  if(t.dataset.f){const i=+t.closest("tr").dataset.i;pg(sv).rows[i][t.dataset.f]=t.value;if(t.dataset.f!=="name")t.parentElement.classList.toggle("has",t.value.trim()!=="");update()}
+  else if(t.dataset.k){pg(sv)[t.dataset.k]=t.value;save()}
+  else if(t.hasAttribute("data-nm")){sv.name=t.value;save()}
+});
+document.addEventListener("click",e=>{
+  const b=e.target.closest("[data-a]");if(!b)return;
+  const a=b.dataset.a,sv=cur();
+  if(a==="share"){share();return}
+  if(a==="tab"){S.tab=b.dataset.v;edit=false}
+  else if(a==="open"){S.cur=b.dataset.id;S.view="detail";edit=false}
+  else if(a==="back"){S.view="list";edit=false}
+  else if(a==="new"){const s=mk("測量 "+(S.surveys.length+1));S.surveys.unshift(s);S.cur=s.id;S.view="detail";S.tab="list";edit=true}
+  else if(a==="edit")edit=!edit;
+  else if(a==="kb")S.kb=S.kb===0?1:0;
+  else if(a==="pg"&&sv)sv.pi=+b.dataset.i;
+  else if(a==="addpg"&&sv){sv.pages.push(mkPage(pg(sv).k));sv.pi=sv.pages.length-1}
+  else if(a==="add5"&&sv){for(let i=0;i<5;i++)pg(sv).rows.push(newRow())}
+  else if(a==="rm"&&sv){const r=pg(sv).rows;if(r.length>1)r.pop()}
+  else if(a==="del"){
+    const id=b.dataset.id;
+    if(armed!==id){armed=id;setTimeout(()=>{if(armed===id){armed="";render()}},3000)}
+    else if(id[0]==="p"){sv.pages.splice(sv.pi,1);sv.pi=Math.max(0,sv.pi-1);armed=""}
+    else{S.surveys=S.surveys.filter(s=>s.id!==id);if(S.cur===id){S.cur=null;S.view="list"}armed="";edit=false}
+  }
+  save();render();
+});
+
+async function share(){
+  const sv=cur();if(!sv)return;const p=pg(sv),c=pageCalc(sv,sv.pi);
+  const L=["測点\tBS\tFS\t高低差\tFS距離\tBS距離\t距離計\tGH"];
+  p.rows.forEach((r,i)=>{const o=c.out[i];if(!o.e)L.push([r.name,r.bs,r.fs,sg(o.d),r.fd,r.bd,fd(o.dd),f3(o.gh)].join("\t"))});
+  L.push(["和",f3(c.sBS),f3(c.sFS),sg(c.sD),fd(c.sF),fd(c.sB),fd(c.sDd),""].join("\t"));
+  L.push(["点検",f3(c.sBS-c.sFS),"","","","",""].join("\t"));
+  const text=sv.name+" ページ"+(sv.pi+1)+"\n"+L.join("\n");
+  try{if(navigator.share){await navigator.share({title:sv.name,text});return}}catch(e){if(e&&e.name==="AbortError")return}
+  try{await navigator.clipboard.writeText(text);say("コピーしました")}catch(e){say("コピーできませんでした")}
+}
+addEventListener("visibilitychange",()=>{if(document.hidden)save()});
+addEventListener("pagehide",save);
+document.addEventListener("keydown",e=>{if(e.key==="Enter"&&e.target.tagName==="INPUT"){e.preventDefault();e.target.blur();save()}});
+applyZoom();
+try{navigator.storage&&navigator.storage.persist&&navigator.storage.persist()}catch(e){}
+addEventListener("offline",()=>say("圏外です。入力は端末に保存されます"));
+addEventListener("online",()=>say("オンラインに戻りました"));
+try{if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js")}catch(e){}
+render();
+</script>
+</body>
+</html>
