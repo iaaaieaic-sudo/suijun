@@ -217,7 +217,7 @@ const ICON={
   share:'<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4M6 11H5v10h14V11h-1"/></svg>'
 };
 function applyZoom(){document.documentElement.style.setProperty("--z",String(S.zoom||0.8))}
-const CSVB='<button data-a="csv" data-v="page">CSV(このページ)</button><button data-a="csv" data-v="all">CSV(全ページ)</button><button data-a="csv" data-v="copy">CSVコピー</button>';
+const CSVB='<button data-a="xlsx">Excel(全ページ・シート別)</button><button data-a="csv" data-v="page">CSV(このページ)</button><button data-a="csv" data-v="all">CSV(全ページ)</button>';
 const commonHTML=()=>`<div class="f"><label for="z0">表示倍率(1=標準、0.8=少し小さく)</label><input id="z0" data-z value="${S.zoom||0.8}" inputmode="decimal"></div><div class="f"><label>数字キーボード</label><button data-a="kb" style="padding:0;min-height:40px;text-align:left;font-weight:600;font-size:18px">${S.kb===0?"電卓型(Enterなし)":"Enter付き"}　▸タップで切替</button></div>`;
 const field=(id,key,label,v,ph,num)=>`<div class="f"><label for="${id}">${label}</label><input id="${id}" data-k="${key}" value="${esc(v)}" ${num?'type="number" step="any"':'inputmode="decimal"'} placeholder="${ph}"></div>`;
 
@@ -234,7 +234,7 @@ ${field("k1","endGH","終点の既知標高 (m)・任意",p.endGH,sv.dir==="b"&&
 ${field("k2","L","路線長 (km)・任意",p.L,"空欄なら距離の合計から自動")}
 ${field("k3","k","許容係数 k (mm/√km)",p.k,"10")}
 ${commonHTML()}
-<div class="f"><label>CSV出力(全ページ=ページごとに別ファイル。往復は同じファイル)</label><div style="display:flex;gap:4px;flex-wrap:wrap">${CSVB}</div></div>
+<div class="f"><label>出力(Excel=ページごとにシート分け。CSV全ページ=1つのファイルにまとめる)</label><div style="display:flex;gap:4px;flex-wrap:wrap">${CSVB}</div></div>
 <p>高低差は「前の行のBS − この行のFS」で自動計算します。手入力すると上書きされ、青字になります。距離計は「前の行のBS距離 + この行のFS距離」を自動で足します(同じ器械点の後視+前視)。</p><p>Enterを押すと、後視→後視距離→次の行の前視→前視距離→同じ行の後視→後視距離…の順に、自動で次の欄へ移動します。</p>
 ${navigator.standalone?"":'<p>ホーム画面に追加: Safariでこのページを開き、共有ボタン →「ホーム画面に追加」。以後はそのアイコンから開くと、全画面のアプリとして使えます。※Safariとホーム画面アプリでは保存データが別になるので、どちらかに統一してください。</p>'}</div>`;
     }else main=`<div class="form">${commonHTML()}<div class="empty">測量リストで測量を開くと、ここで標高などを設定できます。</div></div>`;
@@ -273,6 +273,7 @@ document.addEventListener("click",e=>{
   const a=b.dataset.a,sv=cur();
   if(a==="share"){share();return}
   if(a==="csv"){exportCsv(b.dataset.v);return}
+  if(a==="xlsx"){exportXlsx();return}
   if(a==="tab"){S.tab=b.dataset.v;edit=false}
   else if(a==="open"){S.cur=b.dataset.id;S.view="detail";edit=false}
   else if(a==="back"){S.view="list";edit=false}
@@ -309,17 +310,70 @@ function csvOf(sv,pages){
 }
 async function exportCsv(mode){
   const sv=cur();if(!sv)return;
-  const pages=mode==="page"?[sv.pi]:sv.pages.map((_,i)=>i);
-  if(mode==="copy"){try{await navigator.clipboard.writeText(csvOf(sv,pages).replace(/^\ufeff/,""));say("CSVをコピーしました")}catch(e){say("コピーできませんでした")}return}
-  const base=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_");
-  const files=pages.map(pi=>({name:base+"_p"+(pi+1)+".csv",csv:csvOf(sv,[pi])})).filter(x=>x.csv.indexOf("\n")>=0);
-  if(!files.length){say("出力するデータがありません");return}
-  try{const fl=files.map(x=>new File([x.csv],x.name,{type:"text/csv"}));
-    if(navigator.canShare&&navigator.canShare({files:fl})){await navigator.share({files:fl,title:base});return}}
+  const all=mode!=="page",csv=csvOf(sv,all?sv.pages.map((_,i)=>i):[sv.pi]);
+  if(csv.indexOf("\n")<0){say("出力するデータがありません");return}
+  const name=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_")+(all?"_全ページ":"_p"+(sv.pi+1))+".csv";
+  try{const file=new File([csv],name,{type:"text/csv"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
   catch(e){if(e&&e.name==="AbortError")return}
-  try{for(const x of files){const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([x.csv],{type:"text/csv;charset=utf-8"}));a.download=x.name;document.body.appendChild(a);a.click();a.remove();await new Promise(r=>setTimeout(r,400))}
-    say(files.length+"個のCSVを保存しました");return}catch(e){}
-  say("出力できませんでした。「CSVコピー」をお試しください")
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=name;document.body.appendChild(a);a.click();a.remove();say("CSVを保存しました");return}catch(e){}
+  say("出力できませんでした")
+}
+function crc32(b){let c,crc=-1;if(!crc32.t){crc32.t=[];for(let n=0;n<256;n++){c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;crc32.t[n]=c>>>0}}for(let i=0;i<b.length;i++)crc=crc32.t[(crc^b[i])&255]^(crc>>>8);return(crc^-1)>>>0}
+function zipBlob(files,type){
+  const enc=new TextEncoder(),parts=[],cd=[];let off=0;
+  const u16=n=>[n&255,(n>>8)&255],u32=n=>[n&255,(n>>8)&255,(n>>16)&255,(n>>>24)&255];
+  files.forEach(f=>{const nm=enc.encode(f.name),crc=crc32(f.data),len=f.data.length;
+    const lh=new Uint8Array([0x50,0x4b,3,4,...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(len),...u32(len),...u16(nm.length),...u16(0)]);
+    parts.push(lh,nm,f.data);
+    cd.push(new Uint8Array([0x50,0x4b,1,2,...u16(20),...u16(20),...u16(0x0800),...u16(0),...u16(0),...u16(0x21),...u32(crc),...u32(len),...u32(len),...u16(nm.length),...u16(0),...u16(0),...u16(0),...u16(0),...u32(0),...u32(off)]),nm);
+    off+=lh.length+nm.length+len});
+  const cdsz=cd.reduce((a,x)=>a+x.length,0);
+  const end=new Uint8Array([0x50,0x4b,5,6,0,0,0,0,...u16(files.length),...u16(files.length),...u32(cdsz),...u32(off),0,0]);
+  return new Blob([...parts,...cd,end],{type});
+}
+const XE=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function sheetXML(rows){
+  let x='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><cols><col min="1" max="10" width="13" customWidth="1"/></cols><sheetData>';
+  rows.forEach((r,ri)=>{x+='<row r="'+(ri+1)+'">';r.forEach((v,ci)=>{if(v==null||v==="")return;
+    const ref=String.fromCharCode(65+ci)+(ri+1),st=(ri===0||r.b)?' s="1"':'';
+    x+=typeof v==="number"?'<c r="'+ref+'"'+st+'><v>'+v+'</v></c>':'<c r="'+ref+'"'+st+' t="inlineStr"><is><t xml:space="preserve">'+XE(v)+'</t></is></c>'});x+="</row>"});
+  return x+"</sheetData></worksheet>";
+}
+function sheetRows(sv,pi){
+  const n3=v=>v==null?null:Number((v/1000).toFixed(3));
+  const L=[["往復","測点","BS後視","FS前視","高低差","BS距離","FS距離","距離計","GH地盤高","備考"]];
+  ["f","b"].forEach(dr=>{const p=dr==="b"?sv.pages[pi].back:sv.pages[pi];if(!p)return;
+    const c=pageCalc(sv,pi,dr),lab=dr==="b"?"復":"往";let any=false;
+    p.rows.forEach((r,i)=>{const o=c.out[i];if(o.e)return;any=true;
+      L.push([lab,r.name,n3(mm(r.bs)),n3(mm(r.fs)),n3(o.d),n3(mm(r.bd)),n3(mm(r.fd)),n3(o.dd),n3(o.gh),o.rad?"放射点":""])});
+    if(any){const t=[lab,"和",n3(c.sBS),n3(c.sFS),n3(c.sD),n3(c.sB),n3(c.sF),n3(c.sDd)];t.b=true;L.push(t)}});
+  return L;
+}
+function xlsxBlob(sheets){
+  const T=s=>new TextEncoder().encode(s),H='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+  const NS='xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"',R="http://schemas.openxmlformats.org/officeDocument/2006/relationships",PK='xmlns="http://schemas.openxmlformats.org/package/2006/relationships"';
+  const O="application/vnd.openxmlformats-officedocument.spreadsheetml.";
+  const files=[
+    {name:"[Content_Types].xml",data:T(H+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="'+O+'sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="'+O+'styles+xml"/>'+sheets.map((_,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="'+O+'worksheet+xml"/>').join("")+"</Types>")},
+    {name:"_rels/.rels",data:T(H+"<Relationships "+PK+'><Relationship Id="rId1" Type="'+R+'/officeDocument" Target="xl/workbook.xml"/></Relationships>')},
+    {name:"xl/workbook.xml",data:T(H+"<workbook "+NS+' xmlns:r="'+R+'"><sheets>'+sheets.map((s,i)=>'<sheet name="'+XE(s.name)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join("")+"</sheets></workbook>")},
+    {name:"xl/_rels/workbook.xml.rels",data:T(H+"<Relationships "+PK+">"+sheets.map((_,i)=>'<Relationship Id="rId'+(i+1)+'" Type="'+R+'/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join("")+'<Relationship Id="rId'+(sheets.length+1)+'" Type="'+R+'/styles" Target="styles.xml"/></Relationships>')},
+    {name:"xl/styles.xml",data:T(H+"<styleSheet "+NS+'><fonts count="2"><font><sz val="11"/><name val="Arial"/></font><font><b/><sz val="11"/><name val="Arial"/></font></fonts><fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="2"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/><xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>')},
+    ...sheets.map((s,i)=>({name:"xl/worksheets/sheet"+(i+1)+".xml",data:T(sheetXML(s.rows))}))
+  ];
+  return zipBlob(files,O+"sheet");
+}
+async function exportXlsx(){
+  const sv=cur();if(!sv)return;
+  const sheets=[];sv.pages.forEach((_,pi)=>{const r=sheetRows(sv,pi);if(r.length>1)sheets.push({name:"ページ"+(pi+1),rows:r})});
+  if(!sheets.length){say("出力するデータがありません");return}
+  const name=(sv.name||"suijun").replace(/[\\/:*?"<>|\s]+/g,"_")+".xlsx",blob=xlsxBlob(sheets);
+  try{const file=new File([blob],name,{type:blob.type});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});return}}
+  catch(e){if(e&&e.name==="AbortError")return}
+  try{const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();say("Excelファイルを保存しました");return}catch(e){}
+  say("出力できませんでした")
 }
 async function share(){
   const sv=cur();if(!sv)return;const p=sh(sv),c=pageCalc(sv,sv.pi,sv.dir);
